@@ -1,6 +1,6 @@
 # AbbrvKW
 
-### Allow using abbreviated keyword names in function calls.
+### Use abbreviated keyword names in function calls.
 
 [![Build Status](https://travis-ci.org/gcalderone/AbbrvKW.jl.svg?branch=master)](https://travis-ci.org/gcalderone/AbbrvKW.jl)
 
