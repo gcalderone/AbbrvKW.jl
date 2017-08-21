@@ -7,13 +7,7 @@ struct TestStruct1
   bar::Float64
 end
 
-# Define a function with keywords. NOTE: the keywords are listed in
-# the macro call, NOT in the function definition!
 function TestFunc(;kw...)
-    # Call the @AbbrvKW and define all keywords.  The first argument
-    # is the symbol used in the function definition to catch all the
-    # keywords.  The remaining arguments are the keyword names, their
-    # type (optional) and their default values.
     @AbbrvKW(kw,
              ABool::Bool=true,
              AnotherBool::Bool=false,
