@@ -61,7 +61,7 @@ You may also use `Nullable` values to check whether a keyword has been given:
 using AbbrvKW
 
 function Foo(; kw...)
-    @AbbrvKW(kw, verboseLevel::Nullable {Int}=nothing)
+    @AbbrvKW(kw, verboseLevel::Nullable{Int}=nothing)
 
     if !isnull(verboseLevel)
         println("New verbosity level: ", get(verboseLevel))
