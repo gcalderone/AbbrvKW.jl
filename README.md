@@ -5,13 +5,13 @@
 [![Build Status](https://travis-ci.org/gcalderone/AbbrvKW.jl.svg?branch=master)](https://travis-ci.org/gcalderone/AbbrvKW.jl)
 
 
-Julia supports keyword arguments in function calls, albeit the keyword names must be entirely specified even when there is no possibility of ambiguity.
+Julia supports keyword arguments in function calls but the keyword names must be entirely specified, even when there is no possibility of ambiguity.
 
-In order to improve code readability it may be useful to use abbreviated names. This packages provide such functionality through the `@AbbrvKW` macro.
+In order to improve code readability, and speed up interactive usage on the REPL, it may be useful to use abbreviated names. This packages provide such functionality through the `@AbbrvKW` macro.
 
 The idea for this macro came out from a [post](https://discourse.julialang.org/t/keyword-name-disambiguation/5459) in the Usage forum.  Hopefully, this functionality will be included as a native feature in future versions of Julia.
 
-You may install this package typing
+You may install this package typing:
 
 ``` julia
 Pkg.clone("https://github.com/gcalderone/AbbrvKW.jl.git")
@@ -55,6 +55,23 @@ Foo(Keyw=10, A=20.0, S=30, KeyS="baz")
 ```
 Much shorter, isn't it?
 We also added a line to raise an error if an unrecognized keyword is given.
+
+You may also use `Nullable` values to check whether a keyword has been given:
+``` julia
+using AbbrvKW
+
+function Foo(; kw...)
+    @AbbrvKW(kw, verboseLevel::Nullable {Int}=nothing)
+
+    if !isnull(verboseLevel)
+        println("New verbosity level: ", get(verboseLevel))
+    end
+end
+
+Foo(verb=1)
+```
+
+The last example clearly shows how you can shorten the code to write on the REPL (`Foo(verb=1)`) and use full descriptive keyword names in the function.
 
 
 ## Usage
