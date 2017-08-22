@@ -3,6 +3,33 @@ module AbbrvKW
 import StatsBase.countmap
 export @AbbrvKW
 
+"""
+Allow to use abbreviated keyword names in function calls.
+
+This macro allows to shorten function calls by allowing using
+abbreviated keyword names, while using full descriptive keyword names
+in the function definition.
+
+Example:
+```
+function Foo(; kw...)
+    @AbbrvKW(kw, Keyword::Int=1, verboseLevel::Nullable{Int}=nothing)
+    @assert(length(kw) == 0, "Unrecognized keyword(s): " * string(kw))
+
+    println("Keyword: ", Keyword)
+    if !isnull(verboseLevel)
+        println("New verbosity level: ", get(verboseLevel))
+    end
+end
+
+Foo(verb=1, Key=3)
+```
+
+The `@assert` line raises an error if an unrecognized keyword is given.
+
+The symbol chosen to catch all keywords (`kw` in the above example)
+can be any valid Julia symbol.
+"""
 macro AbbrvKW(outSym, kw...)
     length(kw) != 0 || return :()
 
