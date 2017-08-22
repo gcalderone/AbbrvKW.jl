@@ -71,7 +71,7 @@ end
 Foo(verb=1)
 ```
 
-The last example clearly shows how you can shorten the code to write on the REPL (`Foo(verb=1)`) and use full descriptive keyword names in the function.
+The last example clearly shows how you can shorten the code to be written on the REPL (`Foo(verb=1)`) and use full descriptive keyword names in the function at the same time.
 
 
 ## Usage
