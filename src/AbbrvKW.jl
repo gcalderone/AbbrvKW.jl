@@ -1,7 +1,7 @@
 module AbbrvKW
 
 import StatsBase.countmap
-export @AbbrvKW
+export @AbbrvKW, @AbbrvKW_check
 
 """
 Allow to use abbreviated keyword names in function calls.
@@ -14,7 +14,6 @@ Example:
 ```
 function Foo(; kw...)
     @AbbrvKW(kw, Keyword::Int=1, verboseLevel::Nullable{Int}=nothing)
-    @assert(length(kw) == 0, "Unrecognized keyword(s): " * string(kw))
 
     println("Keyword: ", Keyword)
     if !isnull(verboseLevel)
@@ -25,10 +24,11 @@ end
 Foo(verb=1, Key=3)
 ```
 
-The `@assert` line raises an error if an unrecognized keyword is given.
-
 The symbol chosen to catch all keywords (`kw` in the above example)
 can be any valid Julia symbol.
+
+After the macro call the symbol `kw` will contains only the
+unrecognized keywords.
 """
 macro AbbrvKW(outSym, kw...)
     length(kw) != 0 || return :()
@@ -51,7 +51,7 @@ macro AbbrvKW(outSym, kw...)
         else
             push!(syml, kw[i].args[1])
         end
-        
+
         # Symbol type
         t = :Any
         if typeof(kw[i].args[1]) == Expr
@@ -59,16 +59,16 @@ macro AbbrvKW(outSym, kw...)
         end
         push!(typ , t)
 
-        # Default value            
+        # Default value
         push!(defv, kw[i].args[2])
 
         push!(syma, syml[end])
         push!(syms, string(syml[end]))
     end
-    
+
     # Max length of string representation of keywords
     maxlen = maximum(length.(syms))
-    
+
     # Identify all abbreviations and add them to syma
     orig_syml = deepcopy(syml)
     for len in 1:maxlen
@@ -95,12 +95,12 @@ macro AbbrvKW(outSym, kw...)
             end
         end
     end
-    
+
     # Build output Expr
     expr = Expr(:block)
     for i in 1:length(kw)
         push!(expr.args, Expr(:(=)))
-        
+
         if typ[i] != :Any
             push!(expr.args[end].args, Expr(:(::)))
             push!(expr.args[end].args[end].args, syml[i])
@@ -121,7 +121,7 @@ macro AbbrvKW(outSym, kw...)
             push!(t.args, QuoteNode(s))
         end
 
-        push!(expr.args[end].args[end].args, 
+        push!(expr.args[end].args[end].args,
               :(
                 if $(outSym)[____][1] in $t
                   $(syml[i]) = $(outSym)[____][2]
@@ -134,6 +134,26 @@ macro AbbrvKW(outSym, kw...)
     push!(expr.args, :(____ = nothing))
 
     return esc(expr)
+end
+
+
+"""
+Same purpose as `AbbrvKW`, but this also raises an error if
+unrecognized keyword(s) are given.
+"""
+macro AbbrvKW_check(outSym, kws...)
+    esc_kws = Vector{Any}()
+    for kw in kws
+        push!(esc_kws, esc(kw))
+    end
+    e = :(@AbbrvKW($(esc(outSym)), $(esc_kws...)))
+
+    f = Expr(:block)
+    push!(f.args, e)
+    push!(f.args, esc(:(if length($outSym) !=0 ;
+                        error("Unrecognized keyword(s): " * string($outSym))
+                        end)))
+    return f
 end
 
 end # module

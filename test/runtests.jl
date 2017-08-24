@@ -8,18 +8,16 @@ struct TestStruct1
 end
 
 function TestFunc(;kw...)
-    @AbbrvKW(kw,
-             ABool::Bool=true,
-             AnotherBool::Bool=false,
-             AVector::Vector{Int}=[1,2,3],
-             AString::String="foo",
-             ATuple=(1,2),
-             AStruct::TestStruct1=TestStruct1(0, 3.14),
-             Generic="generic"
-             )
+    @AbbrvKW_check(kw,
+                   ABool::Bool=true,
+                   AnotherBool::Bool=false,
+                   AVector::Vector{Int}=[1,2,3],
+                   AString::String="foo",
+                   ATuple=(1,2),
+                   AStruct::TestStruct1=TestStruct1(0, 3.14),
+                   Generic="generic"
+                   )
     
-    @assert(length(kw) == 0, "Unrecognized keyword(s): " * string(kw))
-
     return (ABool,
             AnotherBool,
             AVector,
