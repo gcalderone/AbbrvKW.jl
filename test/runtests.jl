@@ -34,3 +34,5 @@ b = (true, false, [1, 2, 3], "foo", (1, 2), TestStruct1(1, 2.0), "BAZ")
 for i in 1:length(a)
     @test a[i] == b[i]
 end
+
+@test_throws ErrorException a = TestFunc(zzz=1)
