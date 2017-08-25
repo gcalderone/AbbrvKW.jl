@@ -1,159 +1,170 @@
 module AbbrvKW
 
 import StatsBase.countmap
-export @AbbrvKW, @AbbrvKW_check
+export @AbbrvKW
+
+function findAbbrv(symLong::Vector{Symbol})
+    if length(symLong) == 0 
+        return symLong
+    end
+
+    out = Dict()
+    for sym in symLong
+        out[sym] = Vector{Symbol}()
+    end
+
+    symAbbr = deepcopy(symLong)
+    symStr = convert.(String, symLong)
+    kwCount = length(symLong)
+
+    # Max length of string representation of keywords
+    maxLen = maximum(length.(symStr))
+
+    # Identify all abbreviations
+    for len in 1:maxLen
+        for i in 1:kwCount
+            s = symStr[i]
+            if length(s) >= len
+                s = s[1:len]
+                push!(symLong, symLong[i])
+                push!(symAbbr, convert(Symbol, s))
+                push!(symStr , s)
+            end
+        end
+    end
+    symStr = nothing # no longer needed
+
+    # Identify unique abbreviations
+    abbrCount = 0
+    for (sym, count) in countmap(symAbbr)
+        if count == 1
+            i = find(symAbbr .== sym)
+            @assert length(i) == 1
+            i = i[1]
+            if symLong[i] != symAbbr[i]
+                push!(out[symLong[i]], symAbbr[i])
+                abbrCount += 1
+            end
+        end
+    end
+
+    for (key, val) in out
+        sort!(out[key])
+    end
+
+    return (out, abbrCount)
+end
+
 
 """
 Allow to use abbreviated keyword names in function calls.
 
-This macro allows to shorten function calls by allowing using
-abbreviated keyword names, while using full descriptive keyword names
-in the function definition.
+This macro allows to shorten function calls by means of abbreviated
+keyword names, while using full descriptive keyword names in the
+function definition.
 
 Example:
 ```
-function Foo(; kw...)
-    @AbbrvKW(kw, Keyword::Int=1, verboseLevel::Nullable{Int}=nothing)
-
+@AbbrvKW function Foo(;Keyword::Int=1, verboseLevel::Union{Void,Int}=nothing)
     println("Keyword: ", Keyword)
-    if !isnull(verboseLevel)
-        println("New verbosity level: ", get(verboseLevel))
+    if verboseLevel != nothing
+        println("New verbosity level: ", verboseLevel)
     end
 end
 
-Foo(verb=1, Key=3)
+Foo(verb=1, K=3)
 ```
-
-The symbol chosen to catch all keywords (`kw` in the above example)
-can be any valid Julia symbol.
-
-After the macro call the symbol `kw` will contains only the
-unrecognized keywords.
 """
-macro AbbrvKW(outSym, kw...)
-    length(kw) != 0 || return :()
+macro AbbrvKW(func)
+    @assert func.head == :function "Not a function"
 
-    syml = Vector{Symbol}() # Symbol, long version
-    typ  = Vector{Any}()    # Data type
-    defv = Vector{Any}()    # Default value
-    syma = Vector{Symbol}() # Symbol, abbreviated version
-    syms = Vector{String}() # Symbol converted to String
-
-    for i in 1:length(kw)
-        #dump(kw[i])
-        #println()
-        @assert typeof(kw[i]) == Expr
-
-        # Symbol name
-        if typeof(kw[i].args[1]) == Expr
-            @assert kw[i].args[1].head == :(::)
-            push!(syml, kw[i].args[1].args[1])
-        else
-            push!(syml, kw[i].args[1])
-        end
-
-        # Symbol type
-        t = :Any
-        if typeof(kw[i].args[1]) == Expr
-            t = kw[i].args[1].args[2]
-        end
-        push!(typ , t)
-
-        # Default value
-        push!(defv, kw[i].args[2])
-
-        push!(syma, syml[end])
-        push!(syms, string(syml[end]))
+    if length(func.args[1].args) <= 1
+        # Empty parameter list"
+        return esc(func)
     end
 
-    # Max length of string representation of keywords
-    maxlen = maximum(length.(syms))
+    if (typeof(func.args[1].args[2]) != Expr)  ||
+        (func.args[1].args[2].head != :parameters)
+        # No keywords given
+        return esc(func)
+    end
+    
+    sym = Vector{Symbol}() # Symbol, long version
+    typ = Dict()           # Data type
+    splat = Symbol()
+    splatFound = false    
+    for k in func.args[1].args[2].args
+        @assert typeof(k) == Expr "Expr expected"
+        @assert k.head in (:kw, :(...)) "Expected :kw or :..., got $(k.head)"
 
-    # Identify all abbreviations and add them to syma
-    orig_syml = deepcopy(syml)
-    for len in 1:maxlen
-        abbrv_syml = Vector{Symbol}()
-        abbrv_syma = Vector{Symbol}()
-        abbrv_syms = Vector{String}()
-        for i in 1:length(orig_syml)
-            s = syms[i]
-            if length(s) > len
-                s = s[1:len]
-                push!(abbrv_syml, syml[i])
-                push!(abbrv_syma, convert(Symbol, s))
-                push!(abbrv_syms, s)
-            end
-        end
+        #dump(k)
+        if k.head == :kw
+            @assert typeof(k.args[1]) in (Expr, Symbol) "Expected Expr or Symbol"
 
-        cm = countmap(abbrv_syms)
-        for (sym, count) in cm
-            if count == 1
-                i = find(abbrv_syms .== sym)
-                @assert length(i) == 1
-                push!(syml, abbrv_syml[i[1]])
-                push!(syma, abbrv_syma[i[1]])
+            if typeof(k.args[1]) == Symbol
+                push!(sym, k.args[1])
+                typ[sym[end]] = :Any
+            elseif typeof(k.args[1]) == Expr
+                @assert k.args[1].head == :(::) "Expected :(::), got $(k.args[1].head)"
+                push!(sym, k.args[1].args[1])
+                typ[sym[end]] = k.args[1].args[2]
             end
+        elseif k.head == :(...)
+            splat = k.args[1]
+            splatFound = true
         end
+    end
+
+    # Find abbreviations
+    (abbr, count) = findAbbrv(sym)
+    if count == 0
+        # No abbreviations found
+        return esc(func)
+    end
+
+    # Add a splat variable if not present
+    if !splatFound
+        splat = :_abbrvkw_
+        a = :($splat...)
+        a = a.args[1]
+        push!(func.args[1].args[2].args, a)
+        a = nothing
     end
 
     # Build output Expr
     expr = Expr(:block)
-    for i in 1:length(kw)
-        push!(expr.args, Expr(:(=)))
+    push!(expr.args, :(_ii_ = 1))
+    push!(expr.args, Expr(:while, :(_ii_ <= length($splat)), Expr(:block)))
 
-        if typ[i] != :Any
-            push!(expr.args[end].args, Expr(:(::)))
-            push!(expr.args[end].args[end].args, syml[i])
-            push!(expr.args[end].args[end].args, typ[i])
-        else
-            push!(expr.args[end].args, syml[i])
-        end
-        push!(expr.args[end].args, defv[i])
-    end
-
-    push!(expr.args, :(____ = 1))
-    push!(expr.args, Expr(:while, :(____ <= length($outSym)), Expr(:block)))
-
-    for i in 1:length(kw)
-        j = find(syml .== syml[i])
-        t = Expr(:tuple)
-        for s in syma[j]
-            push!(t.args, QuoteNode(s))
-        end
-
+    for (sym, tup) in abbr
+        length(tup) > 0 || continue
+        tup = tuple(tup...)
         push!(expr.args[end].args[end].args,
               :(
-                if $(outSym)[____][1] in $t
-                  $(syml[i]) = $(outSym)[____][2]
-                  deleteat!($outSym, ____)
-                  continue
+                if $(splat)[_ii_][1] in $tup
+                typeassert($(splat)[_ii_][2], $(typ[sym]))
+                $(sym) = $(splat)[_ii_][2]
+                deleteat!($splat, _ii_)
+                continue
                 end
                 ))
     end
-    push!(expr.args[end].args[end].args, :(____ += 1))
-    push!(expr.args, :(____ = nothing))
+    push!(expr.args[end].args[end].args, :(_ii_ += 1))
+    push!(expr.args, :(_ii_ = nothing))
 
-    return esc(expr)
-end
-
-
-"""
-Same purpose as `AbbrvKW`, but this also raises an error if
-unrecognized keyword(s) are given.
-"""
-macro AbbrvKW_check(outSym, kws...)
-    esc_kws = Vector{Any}()
-    for kw in kws
-        push!(esc_kws, esc(kw))
+    if !splatFound
+        push!(expr.args, :(if length($splat) !=0 ;
+                           error("Unrecognized keyword abbreviation(s): " * string($splat))
+                           end))
+        push!(expr.args, :($splat = nothing))
     end
-    e = :(@AbbrvKW($(esc(outSym)), $(esc_kws...)))
 
-    f = Expr(:block)
-    push!(f.args, e)
-    push!(f.args, esc(:(if length($outSym) !=0 ;
-                        error("Unrecognized keyword(s): " * string($outSym))
-                        end)))
-    return f
+    @assert length(func.args) == 2 "Function Expr has " * string(length(func.args)) * " args"
+    @assert func.args[2].head == :block "Function block is not a block, but " * string(func.args[2].head)
+
+    prepend!(func.args[2].args, [expr])
+    #@show func
+    return esc(func)
 end
 
 end # module
