@@ -58,8 +58,11 @@ end
 @test t9(0, key1=-1, key2=-2) == (0, 12, -1, -2)
 @test_throws MethodError t9(0, ke=0)
 
-@AbbrvKW function t9(x, y=12; key=13, keyA=20); (x, y, key)
+@AbbrvKW function t10(x::Vararg{AbstractArray{T,1},N}; y=12, key=13, aaa=20) where {T,N}
+    (y, key, aaa)
 end
+@test t10([0]) == (12, 13, 20)
+@test t10([0], k=1, a=2) == (12, 1, 2)
 
 
 # Test structure

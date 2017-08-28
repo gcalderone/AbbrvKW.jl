@@ -79,12 +79,19 @@ macro AbbrvKW(func)
     @assert func.head == :function "Not a function"
 
     if length(func.args[1].args) <= 1
-        # Empty parameter list"
+        # Empty parameter list
         return esc(func)
     end
 
-    if (typeof(func.args[1].args[2]) != Expr)  ||
-        (func.args[1].args[2].head != :parameters)
+    if typeof(func.args[1]) == Expr  &&
+        func.args[1].head == :where
+        param = func.args[1].args[1].args[2]
+    else
+        param = func.args[1].args[2]
+    end
+
+    if (typeof(param) != Expr)  ||
+        (param.head != :parameters)
         # No keywords given
         return esc(func)
     end
@@ -93,7 +100,7 @@ macro AbbrvKW(func)
     typ = Dict()           # Data type
     splat = Symbol()
     splatFound = false    
-    for k in func.args[1].args[2].args
+    for k in param.args
         @assert typeof(k) == Expr "Expr expected"
         @assert k.head in (:kw, :(...)) "Expected :kw or :..., got $(k.head)"
 
@@ -127,13 +134,13 @@ macro AbbrvKW(func)
         splat = :_abbrvkw_
         a = :($splat...)
         a = a.args[1]
-        push!(func.args[1].args[2].args, a)
+        push!(param.args, a)
         a = nothing
     end
 
     # Build output Expr
     expr = Expr(:block)
-    push!(expr.args, :(_ii_ = 1))
+    push!(expr.args, :(local _ii_ = 1))
     push!(expr.args, Expr(:while, :(_ii_ <= length($splat)), Expr(:block)))
 
     for (sym, tup) in abbr
